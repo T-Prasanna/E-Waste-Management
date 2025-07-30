@@ -14,8 +14,11 @@
     background: rgba(26, 25, 25, 0.705);
 }
 
-.top-menu ul{
-    
+.top-menu ul {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 10px;
 }
 
 .top-menu li{

@@ -1,513 +1,232 @@
 var express = require("express");
 var app = express();
 var bodyParser = require("body-parser");
-
 var mongoose = require("mongoose");
-mongoose.connect("mongodb://localhost:27017/Ewaste",{useNewUrlParser:true});
 
-var MongoClient = require("mongodb").MongoClient;
-MongoClient.connect("mongodb://localhost:27017/Ewaste", {useNewUrlParser:true},{ useUnifiedTopology: true });
+mongoose.set('strictQuery', true); // To suppress Mongoose deprecation warning
+mongoose.connect("mongodb://localhost:27017/Ewaste", {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+});
 
-var ip= "127.0.0.1";
+var ip = "127.0.0.1";
 var port = 3000;
 
-app.use(bodyParser.urlencoded({extended:true}));
-app.set("view engine","ejs");
-app.use( express.static("public"));
+app.use(bodyParser.urlencoded({ extended: true }));
+app.set("view engine", "ejs");
+app.use(express.static("public"));
 
-//SCHEMA SETUP
+// SCHEMA SETUP
 var employeeSchema = new mongoose.Schema({
-    username : String,
-    password : String ,
-    applicant : String,
-    email : String
+  username: String,
+  password: String,
+  applicant: String,
+  email: String
 });
-var Employee = mongoose.model("Employee",employeeSchema);
+var Employee = mongoose.model("Employee", employeeSchema);
 
 var itemSchema = new mongoose.Schema({
-    type : String,
-    email : String,
-    image : String,
-    quantity : Number,
-    price : String,
-    info : String,
-    sold : Boolean
+  type: String,
+  email: String,
+  image: String,
+  quantity: Number,
+  price: String,
+  info: String,
+  sold: Boolean
 });
-var Item = mongoose.model("Item",itemSchema);
+var Item = mongoose.model("Item", itemSchema);
 
 var paymentSchema = new mongoose.Schema({
-    item_id : {
-        type : mongoose.Schema.Types.ObjectId,
-        ref  : "Item"
-    } ,
-    employee_id : {
-        type : mongoose.Schema.Types.ObjectId,
-        ref : "Employee"
-    },
-    cardHolder : String,
-    email : String,
-    cardNo : String,
-    created: {type:Date, default:Date.now} 
+  item_id: { type: mongoose.Schema.Types.ObjectId, ref: "Item" },
+  employee_id: { type: mongoose.Schema.Types.ObjectId, ref: "Employee" },
+  cardHolder: String,
+  email: String,
+  cardNo: String,
+  created: { type: Date, default: Date.now }
 });
-var Payment = mongoose.model("Payment",paymentSchema);
+var Payment = mongoose.model("Payment", paymentSchema);
 
+app.get("/", (req, res) => res.render("base"));
 
-// Item.create({type:"Mobile",email:"shubha.pawar@gmail.com",image:"https://encrypted-tbn0.gstatic.com/images?q=tbn%3AANd9GcRxEJr2a5TXPDeWGOAg6JxbzU6tiKGzW1YoMP-C-V4XKhXgxsew",quantity:1,price:"150$",info:"Lenovo vibe k5 note"},function(err,newItem){
-//     if(err)console.log(err);
-// });
+app.get("/employees/new", (req, res) => res.render("login"));
 
-// Employee.create({
-//     username:"Shubham", 
-//     password:"Shubham@123", 
-//     applicant:"Admin"
-// },function(err,employee){
-//     if(err){
-//         console.log(err);
-//     }else{
-//         console.log(employee);
-//     }
-// });
-
-
-app.get("/",function(req,res){
-    //res.redirect("/members");
-    res.render("base");
+app.get("/myAccount/:id", async (req, res) => {
+  try {
+    const employee = await Employee.findById(req.params.id);
+    if (!employee) return res.status(404).send("Employee not found");
+    const items = await Item.find({});
+    const view = employee.applicant === "Customer" ? "customer" : "admin";
+    res.render(view, { employee, items });
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("Server Error");
+  }
 });
 
-app.get("/employees/new",function(req,res){
-    res.render("login");
-});
-
-app.get("/myAccount/:id",function(req,res){
-    Employee.findById(req.params.id,function(err,employee){
-        if(err){
-            console.log(err);
-        }else{
-            if(employee.applicant == "Customer"){
-                Item.find({},function(err,items){
-                    if(err){
-                        console.log(err);
-                    }else{
-                        res.render("customer.ejs",{employee:employee,items:items});
-                    }
-                }); 
-            }else{
-                Item.find({},function(err,items){
-                    if(err){
-                        console.log(err);
-                    }else{
-                        res.render("admin.ejs",{employee:employee,items:items});
-                    }
-                }); 
-            }
-        }
-    });
-});
-
-app.post("/validate",function(req,res){
-    var username = req.body.username;
-    var password = req.body.password;
-    var applicant = req.body.applicant;
-    // var employee = {username:username,password:password,applicant:applicant};
-    var flag = false;
-    Employee.find({},function(err,employees){
-        if(err){
-            console.log(err);
-        }else{
-            employees.forEach(function(employee){
-                if(employee.username==username && employee.password == password && employee.applicant == applicant){
-                    if(applicant=="Customer"){
-                        Item.find({},function(err,items){
-                            if(err){
-                                console.log(err);
-                            }else{
-                                res.render("customer.ejs",{employee:employee,items:items});
-                            }
-                        }); 
-                    }else{
-                        Item.find({},function(err,items){
-                            if(err){
-                                console.log(err);
-                            }else{
-                                res.render("admin.ejs",{employee:employee,items:items});
-                            }
-                        });    
-                    }
-                    flag = true;
-                }
-            })
-            if(flag==false){
-                //alert("Invalid User");
-                //console.log("invalid user!");
-                var error_msg = "User Not Found";
-
-                res.render("error",{error_msg:error_msg});
-            }
-            
-        }
-    });
-});
-
-
-
-app.get("/reg",function(req,res){
-    //res.redirect("/members");
-    res.render("registration");
-});
-
-// app.get("/employees",function(req,res){
-//     //res.render("members",{members:members});
-//     Employee.find({},function(err,employees){
-//         if(err){
-//             console.log(err);
-//         }else{
-//             res.render("employees",{employees:employees});
-//         }
-//     });
-// });
-
-app.post("/employees",function(req,res){
-    var username = req.body.username;
-    var password = req.body.password;
-    var confirm_password = req.body.confirm_password;
-    var applicant = req.body.applicant;
-    var email = req.body.email;
-    var newEmployee = {username:username,password:password, applicant:applicant,email:email};
-    var error_msg = "";
-    var add = true ;
-    Employee.find({},function(err,employees){
-        if(err){
-            console.log(err);
-        }else{
-            employees.forEach(function(employee){
-                if(employee.username==newEmployee.username){
-                    error_msg += "Username Already Exists.\n";
-                    add = false;
-                }
-            })
-        }
-    });
-
-    if(password == confirm_password && username.length>=8 && password.length >= 8 && add && email.length >= 8){
-        Employee.create(newEmployee,function(err,newEmployee){
-            if(err){
-                console.log(err);
-            }
-        });
-        res.redirect("/"); 
-    }else{
-        //alert("Password Doesn't match !");
-        //console.log("can't add!");
-        if(username.length < 8 || password.length < 8) error_msg += "Username/Password should contain atleast 8 characters.\n";
-        if(password!=confirm_password) error_msg += "Password and Confirm-Password are not same.\n";
-        res.render("error",{error_msg:error_msg});
+app.post("/validate", async (req, res) => {
+  const { username, password, applicant } = req.body;
+  try {
+    const employees = await Employee.find({});
+    const employee = employees.find(emp => emp.username === username && emp.password === password && emp.applicant === applicant);
+    if (employee) {
+      const items = await Item.find({});
+      const view = applicant === "Customer" ? "customer" : "admin";
+      res.render(view, { employee, items });
+    } else {
+      res.render("error", { error_msg: "User Not Found" });
     }
-    
-    
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("Server Error");
+  }
 });
 
-app.get("/employees/new",function(req,res){
-    res.render("login");
+app.get("/reg", (req, res) => res.render("registration"));
+
+app.post("/employees", async (req, res) => {
+  const { username, password, confirm_password, applicant, email } = req.body;
+  let error_msg = "";
+  try {
+    const existing = await Employee.findOne({ username });
+    if (existing) {
+      error_msg += "Username Already Exists.\n";
+    }
+    if (password !== confirm_password) error_msg += "Password and Confirm-Password are not same.\n";
+    if (username.length < 8 || password.length < 8) error_msg += "Username/Password should contain at least 8 characters.\n";
+    if (email.length < 8) error_msg += "Email is too short.\n";
+
+    if (error_msg === "") {
+      await Employee.create({ username, password, applicant, email });
+      res.redirect("/");
+    } else {
+      res.render("error", { error_msg });
+    }
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("Server Error");
+  }
 });
 
+const renderCategory = (viewName) => async (req, res) => {
+  try {
+    const employee = await Employee.findById(req.params.id);
+    const items = await Item.find({});
+    res.render(viewName, { employee, items });
+  } catch (err) {
+    console.log(err);
+  }
+};
 
-app.get("/mobiles/:id",function(req,res){
-    Item.find({},function(err,items){
-        if(err){
-            console.log(err);
-        }else{
-           
-            Employee.findById(req.params.id,function(err,employee){
-                if(err){
-                    console.log(err);
-                }else{
-                    res.render("show_mobile",{employee:employee,items:items});
-                }
-            });
-        }
-    });
+app.get("/mobiles/:id", renderCategory("show_mobile"));
+app.get("/laptops/:id", renderCategory("show_laptop"));
+app.get("/others/:id", renderCategory("show_others"));
+
+app.get("/items", (req, res) => res.redirect("/"));
+
+app.get("/items/new/:id", async (req, res) => {
+  try {
+    const employee = await Employee.findById(req.params.id);
+    res.render("add_items.ejs", { employee });
+  } catch (err) {
+    console.log(err);
+  }
 });
 
-
-app.get("/laptops/:id",function(req,res){
-    Item.find({},function(err,items){
-        if(err){
-            console.log(err);
-        }else{
-            
-            Employee.findById(req.params.id,function(err,employee){
-                if(err){
-                    console.log(err);
-                }else{
-                    res.render("show_laptop",{employee:employee,items:items});
-                }
-            });
-        }
-    });
-});
-app.get("/others/:id",function(req,res){
-    Item.find({},function(err,items){
-        if(err){
-            console.log(err);
-        }else{
-            
-            Employee.findById(req.params.id,function(err,employee){
-                if(err){
-                    console.log(err);
-                }else{
-                    res.render("show_others",{employee:employee,items:items});
-                }
-            });
-        }
-    });
+app.get("/items/:id", async (req, res) => {
+  const [item_id, employee_id] = req.params.id.split("_");
+  try {
+    const foundItem = await Item.findById(item_id);
+    const employee = await Employee.findById(employee_id);
+    res.render("show", { employee, foundItem });
+  } catch (err) {
+    console.log(err);
+  }
 });
 
-
-
-app.get("/items",function(req,res){
-    res.redirect("/");
+app.post("/items/:id", async (req, res) => {
+  const newItem = { ...req.body, sold: false };
+  await Item.create(newItem);
+  res.redirect("/items/new/" + req.params.id);
 });
 
-
-
-app.get("/items/new/:id",function(req,res){
-    
-    Employee.findById(req.params.id,function(err,employee){
-        if(err){
-            console.log(err);
-        }else{
-            res.render("add_items.ejs",{employee:employee});
-        }
-    });
+app.get("/myItems/:id", async (req, res) => {
+  try {
+    const employee = await Employee.findById(req.params.id);
+    const items = await Item.find({});
+    res.render("item_list", { employee, items });
+  } catch (err) {
+    console.log(err);
+  }
 });
 
-app.get("/items/:id",function(req,res){
-    var id = req.params.id;
-    var index = id.indexOf('_');
-    var item_id = id.substring(0,index);
-    var employee_id = id.substring(index+1);
-    Item.findById(item_id,function(err,foundItem){
-        if(err){
-            console.log(err);
-        }else{
-            Employee.findById(employee_id,function(err,employee){
-                if(err){
-                    console.log(err);
-                }else{
-                    res.render("show",{employee:employee,foundItem:foundItem});
-                }
-            });
-        }
-    });
+app.get("/items/:id/edit", async (req, res) => {
+  try {
+    const foundItem = await Item.findById(req.params.id);
+    res.render("edit", { foundItem });
+  } catch (err) {
+    console.log(err);
+  }
 });
 
-
-
-app.post("/items/:id",function(req,res){
-    var type = req.body.type;
-    var email = req.body.email;
-    var image = req.body.image;
-    var quantity = req.body.quantity;
-    var price = req.body.price;
-    var info = req.body.info;
-    var sold = false ;
-    var newItem = {type:type,email:email,image:image,quantity:quantity,price:price,info:info, sold:sold};
-    Item.create(newItem,function(err,newItem){
-        if(err){
-            console.log(err);
-        }
-    });
-    res.redirect("/items/new/"+req.params.id);
+app.post("/updateItem/:id", async (req, res) => {
+  try {
+    const item = await Item.findByIdAndUpdate(req.params.id, req.body.item);
+    const employee = await Employee.findOne({ email: item.email });
+    res.redirect("/myItems/" + employee._id);
+  } catch (err) {
+    console.log(err);
+  }
 });
 
+const deleteItem = (redirectPath) => async (req, res) => {
+  const [item_id, employee_id] = req.params.id.split("_");
+  try {
+    await Item.findByIdAndRemove(item_id);
+    const employee = await Employee.findById(employee_id);
+    const items = await Item.find({});
+    res.render(redirectPath, { employee, items });
+  } catch (err) {
+    console.log(err);
+  }
+};
 
-// app.get("/showAdmin",function(req,res){
-//     Item.find({},function(err,items){
-//         if(err){
-//             console.log(err);
-//         }else{
-//             res.render("admin",{items:items});
-//         }
-//     });
-// });
-
-app.get("/myItems/:id",function(req,res){
-    Employee.findById(req.params.id,function(err,employee){
-        if(err){
-            console.log(err);
-        }else{
-            Item.find({},function(err,items){
-                if(err){
-                    console.log(err);
-                }else{
-                    res.render("item_list",{employee:employee,items:items});
-                }
-            });
-        }
-    });
-
+app.get("/deleteItem/:id", async (req, res) => {
+  const [, employee_id] = req.params.id.split("_");
+  await Item.findByIdAndRemove(req.params.id.split("_")[0]);
+  res.redirect("/myAccount/" + employee_id);
 });
 
+app.get("/deleteItemFromItemList/:id", deleteItem("item_list"));
 
-//EDIT ROUTE
-app.get("/items/:id/edit",function(req,res){
-    //res.render("edit");
-    Item.findById(req.params.id,function(err,foundItem){
-        if(err){
-            console.log(err);
-        }else{
-            res.render("edit",{foundItem:foundItem});
-        }
-    });
+app.get("/payments", async (req, res) => {
+  const payments = await Payment.find({});
+  res.render("show_payment.ejs", { payments });
 });
 
-//UPDATE ROUTE
-
-app.post("/updateItem/:id",function(req,res){
-    Item.findByIdAndUpdate(req.params.id,req.body.item,function(err,item){
-        if(err){
-            console.log(err);
-        }else{
-            Employee.find({},function(err,employees){
-                if(err){
-                    console.log(err);
-                }else{
-                    employees.forEach(function(employee){
-                        if(employee.email==item.email){
-                            res.redirect("/myItems/"+employee.id);
-                        }
-                    })
-                }
-            });
-        }
-    });
+app.get("/payments/:id", async (req, res) => {
+  const [item_id, employee_id] = req.params.id.split("_");
+  const newPayment = await Payment.create({ item_id, employee_id });
+  await Item.findByIdAndUpdate(item_id, { sold: true });
+  res.render("payment.ejs", { newPayment });
 });
 
-
-
-app.get("/deleteItem/:id",function(req,res){
-    var id = req.params.id;
-    var index = id.indexOf('_');
-    var item_id = id.substring(0,index);
-    var employee_id = id.substring(index+1);
-    Item.findByIdAndRemove(item_id,function(err){
-        if(err){
-            console.log(err);
-        }else{
-            // res.redirect("/myAccount/"+req.params.Employeeid);
-            res.redirect("/myAccount/"+employee_id);
-        }
-    });
+app.post("/payments/:id", async (req, res) => {
+  const updated = await Payment.findByIdAndUpdate(req.params.id, req.body);
+  res.render("done_payment.ejs", { payment: updated });
 });
 
-app.get("/deleteItemFromItemList/:id",function(req,res){
-    var id = req.params.id;
-    var index = id.indexOf('_');
-    var item_id = id.substring(0,index);
-    var employee_id = id.substring(index+1);
-    Employee.findById(employee_id,function(err,employee){
-        
-        Item.findByIdAndRemove(item_id,function(err){
-            if(err){
-                console.log(err);
-            }else{
-                Item.find({},function(err,items){
-                    if(err){
-                        console.log(err);
-                    }else{
-                        res.render("item_list",{employee:employee,items:items});
-                    }
-                });
-            }
-        });
-    });
+app.get("/show_payment/:id", async (req, res) => {
+  const payment = await Payment.findById(req.params.id);
+  const item = await Item.findById(payment.item_id);
+  res.render("show_payment_details.ejs", { payment, item });
 });
 
-//this route is used for admin to show all payments
-app.get("/payments",function(req,res){
-    Payment.find({},function(err,payments){
-        if(err){
-            console.log(err);
-        }else{
-            res.render("show_payment.ejs",{payments:payments});
-        }
-    });
+app.get("/reports", async (req, res) => {
+  const payments = await Payment.find({});
+  const items = await Item.find({});
+  res.render("report.ejs", { payments, items });
 });
 
-
-//used by customer when he buys a item
-app.get("/payments/:id",function(req,res){
-    var id = req.params.id;
-    var index = id.indexOf('_');
-    var item_id = id.substring(0,index);
-    var employee_id = id.substring(index+1);
-    
-    var newPayment = {item_id:item_id, employee_id:employee_id};
-    Payment.create(newPayment,function(err,newPayment){
-        if(err){
-            console.log(err);
-        }else{
-            Item.findByIdAndUpdate(item_id,{sold:true},function(err){
-                if(err){
-                    console.log(err);
-                }else{
-                    res.render("payment.ejs",{newPayment:newPayment});
-                }
-            });
-        }
-    });
-});
-
-
-//payment details are updated in the payment
-app.post("/payments/:id",function(req,res){
-        var cardHolder = req.body.cardHolder;
-        var email = req.body.email;
-        var cardNo = req.body.cardNo;
-        var newPayment = {cardHolder:cardHolder,email:email,cardNo:cardNo};
-        Payment.findByIdAndUpdate(req.params.id,newPayment,function(err,payment){
-            if(err){
-                console.log(err);
-            }else{
-                res.render("done_payment.ejs",{payment:payment});
-            }
-        });
-});
-
-app.get("/show_payment/:id",function(req,res){
-    Payment.findById(req.params.id,function(err,payment){
-        if(err){
-            console.log(err);
-        }else{
-            Item.findById(payment.item_id,function(err,item){
-                if(err){
-                    console.log(err);
-                }else{
-                    res.render("show_payment_details.ejs",{payment:payment,item:item});
-                }
-            });
-            
-        }
-    });
-});
-
-app.get("/reports",function(req,res){
-    Payment.find({},function(err,payments){
-        if(err){
-            console.log(err);
-        }else{
-            Item.find({},function(err,items){
-                if(err){
-                    console.log(err);
-                }else{
-                    res.render("report.ejs",{payments:payments,items:items});
-                }
-            });
-            
-        }
-    });
-});
-
-app.listen(port,ip,function(){
-    console.log("Server has started !");
+app.listen(port, ip, () => {
+  console.log("Server has started !");
 });
